@@ -11,6 +11,10 @@ const camera = new THREE.PerspectiveCamera(
 );
 camera.position.set(0, 40, 120);
 
+// Store default camera state
+const defaultCameraPosition = camera.position.clone();
+const defaultCameraLookAt = new THREE.Vector3(0, 0, 0);
+
 // Renderer
 const renderer = new THREE.WebGLRenderer({ antialias: true });
 renderer.setSize(window.innerWidth, window.innerHeight);
@@ -42,22 +46,32 @@ const planetData = [
   { name: 'Neptune', color: 0x4062b3, size: 3.1, distance: 58, speed: 0.005 }
 ];
 
-// Store planet meshes and their orbital angles
 const planets = [];
 const planetAngles = [];
+const textureLoader = new THREE.TextureLoader();
+
+// Remove old planets if any (for idempotency)
+planets.forEach(mesh => scene.remove(mesh));
+planets.length = 0;
+planetAngles.length = 0;
 
 planetData.forEach((planet, i) => {
   const geometry = new THREE.SphereGeometry(planet.size, 32, 32);
-  const material = new THREE.MeshStandardMaterial({ color: planet.color });
+  let material;
+  if (planet.name === 'Earth') {
+    const earthTexture = textureLoader.load('https://threejs.org/examples/textures/planets/earth_atmos_2048.jpg');
+    material = new THREE.MeshStandardMaterial({ map: earthTexture });
+  } else {
+    material = new THREE.MeshStandardMaterial({ color: planet.color });
+  }
   const mesh = new THREE.Mesh(geometry, material);
   scene.add(mesh);
   planets.push(mesh);
-  planetAngles.push(Math.random() * Math.PI * 2); // random start angle
+  planetAngles.push(Math.random() * Math.PI * 2);
 });
 
 // --- Speed Control Panel ---
 const planetControlsDiv = document.getElementById('planet-controls');
-
 planetData.forEach((planet, i) => {
   const wrapper = document.createElement('div');
   wrapper.style.marginBottom = '10px';
@@ -75,19 +89,15 @@ planetData.forEach((planet, i) => {
   const valueSpan = document.createElement('span');
   valueSpan.innerText = planet.speed;
   valueSpan.style.marginLeft = '8px';
-
   slider.addEventListener('input', (e) => {
     planetData[i].speed = parseFloat(slider.value);
     valueSpan.innerText = slider.value;
   });
-
   wrapper.appendChild(label);
   wrapper.appendChild(slider);
   wrapper.appendChild(valueSpan);
   planetControlsDiv.appendChild(wrapper);
 });
-
-const clock = new THREE.Clock();
 
 // --- Pause/Resume Animation ---
 let isPaused = false;
@@ -132,14 +142,12 @@ const tooltip = document.getElementById('tooltip');
 const raycaster = new THREE.Raycaster();
 const mouse = new THREE.Vector2();
 let hoveredPlanetIdx = null;
-
 function onPointerMove(event) {
   const rect = renderer.domElement.getBoundingClientRect();
   mouse.x = ((event.clientX - rect.left) / rect.width) * 2 - 1;
   mouse.y = -((event.clientY - rect.top) / rect.height) * 2 + 1;
 }
 window.addEventListener('pointermove', onPointerMove);
-
 function updateTooltip() {
   raycaster.setFromCamera(mouse, camera);
   const intersects = raycaster.intersectObjects(planets);
@@ -167,7 +175,6 @@ renderer.domElement.addEventListener('click', (event) => {
   if (intersects.length > 0) {
     const idx = planets.indexOf(intersects[0].object);
     if (idx !== -1) {
-      // Focus camera on planet
       cameraTarget = {
         position: new THREE.Vector3(
           planets[idx].position.x,
@@ -181,20 +188,37 @@ renderer.domElement.addEventListener('click', (event) => {
   }
 });
 
-// Responsive resize
+// --- Top View Button ---
+const topViewBtn = document.getElementById('top-view-btn');
+topViewBtn.addEventListener('click', () => {
+  cameraTarget = {
+    position: new THREE.Vector3(0, 120, 0.01),
+    lookAt: new THREE.Vector3(0, 0, 0)
+  };
+  cameraLerpAlpha = 0;
+});
+
+// --- Reset View Button ---
+const resetViewBtn = document.getElementById('reset-view-btn');
+resetViewBtn.addEventListener('click', () => {
+  cameraTarget = {
+    position: defaultCameraPosition.clone(),
+    lookAt: defaultCameraLookAt.clone()
+  };
+  cameraLerpAlpha = 0;
+});
+
+const clock = new THREE.Clock();
 window.addEventListener('resize', () => {
   camera.aspect = window.innerWidth / window.innerHeight;
   camera.updateProjectionMatrix();
   renderer.setSize(window.innerWidth, window.innerHeight);
 });
 
-// Animation loop
 function animate() {
   requestAnimationFrame(animate);
-
   if (!isPaused) {
     const delta = clock.getDelta();
-    // Animate planet orbits
     planets.forEach((mesh, i) => {
       planetAngles[i] += planetData[i].speed * delta;
       const angle = planetAngles[i];
@@ -204,19 +228,15 @@ function animate() {
         0,
         Math.sin(angle) * dist
       );
-      // Optional: planet self-rotation
       mesh.rotation.y += 0.02;
     });
   }
-
-  // Camera smooth zoom/focus
   if (cameraTarget) {
     cameraLerpAlpha += 0.04;
     camera.position.lerp(cameraTarget.position, cameraLerpAlpha);
     camera.lookAt(cameraTarget.lookAt);
     if (cameraLerpAlpha >= 1) cameraTarget = null;
   }
-
   updateTooltip();
   renderer.render(scene, camera);
 }
