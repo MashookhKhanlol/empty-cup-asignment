@@ -1,0 +1,52 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>3D Solar System Simulation</title>
+  <style>
+    body {
+      margin: 0;
+      padding: 0;
+      overflow: hidden;
+      font-family: Arial, sans-serif;
+      background: #111;
+      color: #fff;
+    }
+    #container {
+      width: 100vw;
+      height: 100vh;
+      position: relative;
+    }
+    #control-panel {
+      position: absolute;
+      top: 10px;
+      left: 10px;
+      background: rgba(20, 20, 20, 0.85);
+      padding: 16px;
+      border-radius: 8px;
+      z-index: 10;
+      max-width: 90vw;
+      box-sizing: border-box;
+    }
+    @media (max-width: 600px) {
+      #control-panel {
+        font-size: 14px;
+        padding: 10px;
+      }
+    }
+  </style>
+</head>
+<body>
+  <div id="container">
+    <div id="control-panel">
+      <h3>Planet Speed Controls</h3>
+      <div id="planet-controls">
+        <!-- Sliders will be injected here by JS -->
+      </div>
+    </div>
+  </div>
+  <script src="https://cdn.jsdelivr.net/npm/three@0.153.0/build/three.min.js"></script>
+  <script src="main.js"></script>
+</body>
+</html> 
