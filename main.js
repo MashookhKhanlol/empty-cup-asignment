@@ -89,6 +89,98 @@ planetData.forEach((planet, i) => {
 
 const clock = new THREE.Clock();
 
+// --- Pause/Resume Animation ---
+let isPaused = false;
+const pauseBtn = document.getElementById('pause-btn');
+pauseBtn.addEventListener('click', () => {
+  isPaused = !isPaused;
+  pauseBtn.textContent = isPaused ? 'Resume' : 'Pause';
+});
+
+// --- Dark/Light Mode Toggle ---
+let isDark = true;
+const themeToggle = document.getElementById('theme-toggle');
+function setTheme(dark) {
+  isDark = dark;
+  document.body.style.background = dark ? '#111' : '#f4f4f4';
+  document.body.style.color = dark ? '#fff' : '#222';
+  renderer.setClearColor(dark ? 0x111111 : 0xf4f4f4);
+  themeToggle.textContent = dark ? 'Light Mode' : 'Dark Mode';
+}
+themeToggle.addEventListener('click', () => setTheme(!isDark));
+setTheme(true);
+
+// --- Background Stars ---
+function addStars(numStars = 400) {
+  const starGeometry = new THREE.BufferGeometry();
+  const starVertices = [];
+  for (let i = 0; i < numStars; i++) {
+    const x = (Math.random() - 0.5) * 800;
+    const y = (Math.random() - 0.5) * 800;
+    const z = (Math.random() - 0.5) * 800;
+    starVertices.push(x, y, z);
+  }
+  starGeometry.setAttribute('position', new THREE.Float32BufferAttribute(starVertices, 3));
+  const starMaterial = new THREE.PointsMaterial({ color: 0xffffff, size: 1 });
+  const stars = new THREE.Points(starGeometry, starMaterial);
+  scene.add(stars);
+}
+addStars();
+
+// --- Planet Labels/Tooltips ---
+const tooltip = document.getElementById('tooltip');
+const raycaster = new THREE.Raycaster();
+const mouse = new THREE.Vector2();
+let hoveredPlanetIdx = null;
+
+function onPointerMove(event) {
+  const rect = renderer.domElement.getBoundingClientRect();
+  mouse.x = ((event.clientX - rect.left) / rect.width) * 2 - 1;
+  mouse.y = -((event.clientY - rect.top) / rect.height) * 2 + 1;
+}
+window.addEventListener('pointermove', onPointerMove);
+
+function updateTooltip() {
+  raycaster.setFromCamera(mouse, camera);
+  const intersects = raycaster.intersectObjects(planets);
+  if (intersects.length > 0) {
+    const idx = planets.indexOf(intersects[0].object);
+    if (idx !== -1) {
+      hoveredPlanetIdx = idx;
+      tooltip.style.display = 'block';
+      tooltip.textContent = planetData[idx].name;
+      tooltip.style.left = (window.event.clientX + 12) + 'px';
+      tooltip.style.top = (window.event.clientY - 10) + 'px';
+      return;
+    }
+  }
+  hoveredPlanetIdx = null;
+  tooltip.style.display = 'none';
+}
+
+// --- Camera Zoom/Focus on Planet Click ---
+let cameraTarget = null;
+let cameraLerpAlpha = 0;
+renderer.domElement.addEventListener('click', (event) => {
+  raycaster.setFromCamera(mouse, camera);
+  const intersects = raycaster.intersectObjects(planets);
+  if (intersects.length > 0) {
+    const idx = planets.indexOf(intersects[0].object);
+    if (idx !== -1) {
+      // Focus camera on planet
+      cameraTarget = {
+        position: new THREE.Vector3(
+          planets[idx].position.x,
+          10,
+          planets[idx].position.z + 10
+        ),
+        lookAt: planets[idx].position.clone()
+      };
+      cameraLerpAlpha = 0;
+    }
+  }
+});
+
 // Responsive resize
 window.addEventListener('resize', () => {
   camera.aspect = window.innerWidth / window.innerHeight;
@@ -100,22 +192,32 @@ window.addEventListener('resize', () => {
 function animate() {
   requestAnimationFrame(animate);
 
-  const delta = clock.getDelta();
+  if (!isPaused) {
+    const delta = clock.getDelta();
+    // Animate planet orbits
+    planets.forEach((mesh, i) => {
+      planetAngles[i] += planetData[i].speed * delta;
+      const angle = planetAngles[i];
+      const dist = planetData[i].distance;
+      mesh.position.set(
+        Math.cos(angle) * dist,
+        0,
+        Math.sin(angle) * dist
+      );
+      // Optional: planet self-rotation
+      mesh.rotation.y += 0.02;
+    });
+  }
 
-  // Animate planet orbits
-  planets.forEach((mesh, i) => {
-    planetAngles[i] += planetData[i].speed * delta;
-    const angle = planetAngles[i];
-    const dist = planetData[i].distance;
-    mesh.position.set(
-      Math.cos(angle) * dist,
-      0,
-      Math.sin(angle) * dist
-    );
-    // Optional: planet self-rotation
-    mesh.rotation.y += 0.02;
-  });
+  // Camera smooth zoom/focus
+  if (cameraTarget) {
+    cameraLerpAlpha += 0.04;
+    camera.position.lerp(cameraTarget.position, cameraLerpAlpha);
+    camera.lookAt(cameraTarget.lookAt);
+    if (cameraLerpAlpha >= 1) cameraTarget = null;
+  }
 
+  updateTooltip();
   renderer.render(scene, camera);
 }
 animate(); 
