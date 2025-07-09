@@ -55,6 +55,38 @@ planetData.forEach((planet, i) => {
   planetAngles.push(Math.random() * Math.PI * 2); // random start angle
 });
 
+// --- Speed Control Panel ---
+const planetControlsDiv = document.getElementById('planet-controls');
+
+planetData.forEach((planet, i) => {
+  const wrapper = document.createElement('div');
+  wrapper.style.marginBottom = '10px';
+  const label = document.createElement('label');
+  label.innerText = `${planet.name}: `;
+  label.htmlFor = `speed-${i}`;
+  const slider = document.createElement('input');
+  slider.type = 'range';
+  slider.min = 0.001;
+  slider.max = 0.07;
+  slider.step = 0.001;
+  slider.value = planet.speed;
+  slider.id = `speed-${i}`;
+  slider.style.width = '100px';
+  const valueSpan = document.createElement('span');
+  valueSpan.innerText = planet.speed;
+  valueSpan.style.marginLeft = '8px';
+
+  slider.addEventListener('input', (e) => {
+    planetData[i].speed = parseFloat(slider.value);
+    valueSpan.innerText = slider.value;
+  });
+
+  wrapper.appendChild(label);
+  wrapper.appendChild(slider);
+  wrapper.appendChild(valueSpan);
+  planetControlsDiv.appendChild(wrapper);
+});
+
 const clock = new THREE.Clock();
 
 // Responsive resize
